@@ -1,12 +1,15 @@
 // ==UserScript==
 // @name         YouTube - Ad-Free!
-// @version      0.1
-// @description  Skips and removes ads on YouTube automatically
-// @author       ahidalgo
+// @namespace    https://www.hidalgocare.com/
+// @version      0.101
+// @description  Avoids advertisements taking away from your YouTube experience
+// @author       Antonio Hidalgo
 // @match        https://www.youtube.com/*
 // @grant        none
-// @namespace    https://www.hidalgocare.com/
+// @updateURL    https://raw.githubusercontent.com/tchuke/userscripts/master/src/youtube.js
+// @downloadURL  https://raw.githubusercontent.com/tchuke/userscripts/master/src/youtube.js
 // ==/UserScript==
+
 (function () {
     'use strict';
 
@@ -15,6 +18,7 @@
         console.log(arg);
         /* eslint-enable */
     }
+
     function addNewStyle(newStyle) {
         let styleElement = document.getElementById('styles_js');
         if (!styleElement) {
@@ -35,7 +39,7 @@
     function updateUserLastSpeed(videos) {
         videos.forEach(video => {
             const rate = video.playbackRate;
-            //console.log("Video is set to " + rate);
+            //log(`Video is set to ${rate}`);
             if (rate !== HTML5_MAX_SPEED) {
                 if (rate === NORMAL_SPEED) {
                     // We can't tell if this is due to user or newly loaded video, so do nothing.
@@ -50,7 +54,7 @@
         videos.forEach(video => {
             let oldRate = video.playbackRate;
             if (oldRate !== newRate) {
-                //console.log(`Setting video to speed ${newRate}`);
+                //log(`Setting video to speed ${ newRate }`);
                 video.playbackRate = newRate;
             }
             if (oldRate === HTML5_MAX_SPEED) {
@@ -66,8 +70,9 @@
             }
         });
     }
+
     function skipAds(targets) {
-        //    console.log("skipAds() called");
+        // log("skipAds() called");
         targets.forEach(target => {
             let skipButtons = target.getElementsByClassName("ytp-ad-skip-button");
             if (skipButtons.length) {
