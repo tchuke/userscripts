@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YouTube - Ad-Free!
 // @namespace    https://www.hidalgocare.com/
-// @version      0.101
+// @version      0.102
 // @description  Avoids advertisements taking away from your YouTube experience
 // @author       Antonio Hidalgo
 // @match        https://www.youtube.com/*
@@ -103,7 +103,7 @@
     // Seen by Tony:
     addNewStyle('ytd-promoted-sparkles-web-renderer, .ytd-promoted-sparkles-text-search-renderer, .ytp-ad-overlay-slot {display:none !important;}');
 
-    addNewStyle(`video.${AD_CSS_CLASS} {filter: opacity(5%) hue-rotate(120deg) grayscale(50%);}`);
+    addNewStyle(`video.${AD_CSS_CLASS} {filter: opacity(5%);}`);
 
     const waitingForPlayer = setInterval(() => {
         let onPageWithPlayer = (location.pathname === "/watch");
