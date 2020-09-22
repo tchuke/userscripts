@@ -1,10 +1,12 @@
 // ==UserScript==
 // @name         YouTube - Ad-Free!
 // @namespace    https://www.hidalgocare.com/
-// @version      0.102
+// @version      0.103
 // @description  Avoids advertisements taking away from your YouTube experience
 // @author       Antonio Hidalgo
-// @match        https://www.youtube.com/*
+// @include      https://www.youtube.com/*
+// @exclude      https://www.youtube.com/ad_companion*
+// @exclude      https://www.youtube.com/live_chat_replay*
 // @grant        none
 // @updateURL    https://raw.githubusercontent.com/tchuke/userscripts/master/src/youtube.js
 // @downloadURL  https://raw.githubusercontent.com/tchuke/userscripts/master/src/youtube.js
@@ -30,90 +32,114 @@
         styleElement.appendChild(document.createTextNode(newStyle));
     }
 
-    const HTML5_MAX_SPEED = 16.0;
-    const NORMAL_SPEED = 1.0;
-    const AD_CSS_CLASS = "tony-ad";
-
-    let userLastSpeed = NORMAL_SPEED;
-
-    function updateUserLastSpeed(videos) {
-        videos.forEach(video => {
-            const rate = video.playbackRate;
-            //log(`Video is set to ${rate}`);
-            if (rate !== HTML5_MAX_SPEED) {
-                if (rate === NORMAL_SPEED) {
-                    // We can't tell if this is due to user or newly loaded video, so do nothing.
-                } else {
-                    userLastSpeed = rate;
-                }
-            }
-        });
+    function handleStaticAds() {
+        // Not seen: #player-ads
+        addNewStyle('ytd-promoted-sparkles-web-renderer, .ytd-promoted-sparkles-text-search-renderer, .ytp-ad-overlay-slot {display:none !important;}');
     }
 
-    function updateVideosSpeed(videos, newRate) {
-        videos.forEach(video => {
-            let oldRate = video.playbackRate;
-            if (oldRate !== newRate) {
-                //log(`Setting video to speed ${ newRate }`);
-                video.playbackRate = newRate;
+    function handleVideoAds() {
+
+        const adCounter = {
+            ads: [0, 0],
+            durations: [0, 0],
+            addD: function addD(secs, idx) {
+                this.ads[idx] = this.ads[idx] + 1;
+                if (secs) {
+                    this.durations[idx] = this.durations[idx] + secs;
+                }
+                return [this.ads[idx], this.durations[idx]];
+            },
+            addClickedAdDuration: function addClickedAdDuration(secs) {
+                return this.addD(secs, 0);
+            },
+            addForwardedAdDuration: function addForwardedAdDuration(secs) {
+                return this.addD(secs, 1);
             }
-            if (oldRate === HTML5_MAX_SPEED) {
-                if (newRate !== HTML5_MAX_SPEED) {
-                    log("SLOWING DOWN for CONTENT.");
-                    video.classList.remove(AD_CSS_CLASS);
+        };
+
+        function secsToTimeString(secs) {
+            const durationMinutes = Math.floor(secs / 60);
+            const durationSeconds = Math.floor(secs % 60);
+            return `${durationMinutes} mins ${durationSeconds} secs`;
+        }
+
+        const HTML5_MAX_SPEED = 16.0;
+
+        const memoizeUserLastSpeed = (function () {
+            const NORMAL_SPEED = 1.0;
+            let userLastSpeed = NORMAL_SPEED;
+            return function (rate) {
+                //log(`Video is set to ${rate}`);
+                if (rate !== HTML5_MAX_SPEED) {
+                    if (rate === NORMAL_SPEED) {
+                        // We can't tell if this is due to user or newly loaded video, so do nothing.
+                    } else {
+                        userLastSpeed = rate;
+                    }
+                }
+                return userLastSpeed;
+            };
+        }());
+
+        function updateVideoSpeed(video, newRate) {
+            const oldRate = video.playbackRate;
+            const rateHasChanged = (oldRate !== newRate);
+            if (rateHasChanged) {
+                //log(`Changing video to speed ${ newRate }`);
+                video.playbackRate = newRate;
+                if (newRate === HTML5_MAX_SPEED) {
+                    video.muted = true;
+                    const [totalAds, totalDuration] = adCounter.addForwardedAdDuration(video.duration);
+                    log(`SPEEDING UP an AD (${totalAds} so far saving you ${secsToTimeString(totalDuration)}) !`);
+                } else {
                     video.muted = false;
                 }
-            } else if (newRate === HTML5_MAX_SPEED) {
-                log("SPEEDING UP for AD!");
-                video.classList.add(AD_CSS_CLASS);
-                video.muted = true;
-            }
-        });
-    }
-
-    function skipAds(targets) {
-        // log("skipAds() called");
-        targets.forEach(target => {
-            let skipButtons = target.getElementsByClassName("ytp-ad-skip-button");
-            if (skipButtons.length) {
-                Array.from(skipButtons).forEach(skipButton => skipButton.click());
-                log("SKIPPED A CLICKABLE AD!");
-            } else {
-                let videos = target.querySelectorAll('video');
-                updateUserLastSpeed(videos);
-                let newRate = target.getElementsByClassName("ytp-ad-text").length ? HTML5_MAX_SPEED : userLastSpeed;
-                updateVideosSpeed(videos, newRate);
-            }
-        });
-    }
-
-    function startPlayersObserver(targets) {
-        let observer = new MutationObserver(() => skipAds(targets));
-        const options = {
-            childList: true,
-            subtree: true,
-        };
-        targets.forEach(target => {
-            observer.observe(target, options);
-        });
-    }
-
-    // Not seen by Tony:
-    // #player-ads
-    // Seen by Tony:
-    addNewStyle('ytd-promoted-sparkles-web-renderer, .ytd-promoted-sparkles-text-search-renderer, .ytp-ad-overlay-slot {display:none !important;}');
-
-    addNewStyle(`video.${AD_CSS_CLASS} {filter: opacity(5%);}`);
-
-    const waitingForPlayer = setInterval(() => {
-        let onPageWithPlayer = (location.pathname === "/watch");
-        if (onPageWithPlayer) {
-            let players = document.querySelectorAll("ytd-player");
-            log(`players length: ${players.length}`);
-            if (players.length) {
-                startPlayersObserver(players);
-                clearInterval(waitingForPlayer);
             }
         }
-    }, 250);
+
+        function skipAds(video, adAncestor) {
+            //log("skipAds() called");
+            const [adContainer] = adAncestor.getElementsByClassName("video-ads");
+            const skipButtons = adContainer.getElementsByClassName("ytp-ad-skip-button");
+            const areSkipButtons = skipButtons.length;
+            if (areSkipButtons) {
+                const [totalAds, totalDuration] = adCounter.addClickedAdDuration(video.duration);
+                log(`SKIPPING a clickable AD (${totalAds} so far saving you ${secsToTimeString(totalDuration)}) !`);
+                Array.from(skipButtons).forEach(skipButton => skipButton.click());
+            } else {
+                const userLastSpeed = memoizeUserLastSpeed(video.playbackRate);
+                const adLength = adContainer.getElementsByClassName("ytp-ad-text").length;
+                const newRate = adLength ? HTML5_MAX_SPEED : userLastSpeed;
+                updateVideoSpeed(video, newRate);
+            }
+        }
+
+        function startPlayerObserver(target) {
+            const options = {
+                childList: true,
+                subtree: true,
+            };
+            const videos = target.querySelectorAll('video');
+            const [video] = videos;
+            const observer = new MutationObserver(() => skipAds(video, target));
+            observer.observe(target, options);
+        }
+
+        const waitingForPlayer = setInterval(() => {
+            const onPageWithPlayer = (location.pathname === "/watch");
+            if (onPageWithPlayer) {
+                const players = document.querySelectorAll("div.html5-video-player");
+                log(`players length: ${players.length}`);
+                if (players.length) {
+                    const [player] = players;
+                    startPlayerObserver(player);
+                    clearInterval(waitingForPlayer);
+                }
+            }
+        }, 250);
+    }
+
+    handleStaticAds();
+    handleVideoAds();
+
 }());
