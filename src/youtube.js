@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YouTube - Ad-Free!
 // @namespace    https://www.hidalgocare.com/
-// @version      0.103
+// @version      0.104
 // @description  Avoids advertisements taking away from your YouTube experience
 // @author       Antonio Hidalgo
 // @include      https://www.youtube.com/*
@@ -33,7 +33,6 @@
     }
 
     function handleStaticAds() {
-        // Not seen: #player-ads
         addNewStyle('ytd-promoted-sparkles-web-renderer, .ytd-promoted-sparkles-text-search-renderer, .ytp-ad-overlay-slot {display:none !important;}');
     }
 
@@ -69,7 +68,6 @@
             const NORMAL_SPEED = 1.0;
             let userLastSpeed = NORMAL_SPEED;
             return function (rate) {
-                //log(`Video is set to ${rate}`);
                 if (rate !== HTML5_MAX_SPEED) {
                     if (rate === NORMAL_SPEED) {
                         // We can't tell if this is due to user or newly loaded video, so do nothing.
@@ -85,7 +83,6 @@
             const oldRate = video.playbackRate;
             const rateHasChanged = (oldRate !== newRate);
             if (rateHasChanged) {
-                //log(`Changing video to speed ${ newRate }`);
                 video.playbackRate = newRate;
                 if (newRate === HTML5_MAX_SPEED) {
                     video.muted = true;
@@ -98,19 +95,20 @@
         }
 
         function skipAds(video, adAncestor) {
-            //log("skipAds() called");
             const [adContainer] = adAncestor.getElementsByClassName("video-ads");
-            const skipButtons = adContainer.getElementsByClassName("ytp-ad-skip-button");
-            const areSkipButtons = skipButtons.length;
-            if (areSkipButtons) {
-                const [totalAds, totalDuration] = adCounter.addClickedAdDuration(video.duration);
-                log(`SKIPPING a clickable AD (${totalAds} so far saving you ${secsToTimeString(totalDuration)}) !`);
-                Array.from(skipButtons).forEach(skipButton => skipButton.click());
-            } else {
-                const userLastSpeed = memoizeUserLastSpeed(video.playbackRate);
-                const adLength = adContainer.getElementsByClassName("ytp-ad-text").length;
-                const newRate = adLength ? HTML5_MAX_SPEED : userLastSpeed;
-                updateVideoSpeed(video, newRate);
+            if (adContainer) {
+                const skipButtons = adContainer.getElementsByClassName("ytp-ad-skip-button");
+                const areSkipButtons = skipButtons.length;
+                if (areSkipButtons) {
+                    const [totalAds, totalDuration] = adCounter.addClickedAdDuration(video.duration);
+                    log(`SKIPPING a clickable AD (${totalAds} so far saving you ${secsToTimeString(totalDuration)}) !`);
+                    Array.from(skipButtons).forEach(skipButton => skipButton.click());
+                } else {
+                    const userLastSpeed = memoizeUserLastSpeed(video.playbackRate);
+                    const adLength = adContainer.getElementsByClassName("ytp-ad-text").length;
+                    const newRate = adLength ? HTML5_MAX_SPEED : userLastSpeed;
+                    updateVideoSpeed(video, newRate);
+                }
             }
         }
 
@@ -129,8 +127,9 @@
             const onPageWithPlayer = (location.pathname === "/watch");
             if (onPageWithPlayer) {
                 const players = document.querySelectorAll("div.html5-video-player");
-                log(`players length: ${players.length}`);
-                if (players.length) {
+                const playersSpotted = players.length;
+                log(`players spotted: ${playersSpotted}`);
+                if (playersSpotted) {
                     const [player] = players;
                     startPlayerObserver(player);
                     clearInterval(waitingForPlayer);
