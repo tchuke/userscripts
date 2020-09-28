@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YouTube - Ad-Free!
 // @namespace    https://www.hidalgocare.com/
-// @version      0.104
+// @version      0.105
 // @description  Avoids advertisements taking away from your YouTube experience
 // @author       Antonio Hidalgo
 // @include      https://www.youtube.com/*
@@ -33,7 +33,11 @@
     }
 
     function handleStaticAds() {
-        addNewStyle('ytd-promoted-sparkles-web-renderer, .ytd-promoted-sparkles-text-search-renderer, .ytp-ad-overlay-slot {display:none !important;}');
+        addNewStyle(`
+        ytd-companion-slot-renderer,
+        ytd-promoted-sparkles-web-renderer,
+        .ytd-promoted-sparkles-text-search-renderer,
+        .ytp-ad-overlay-slot {display:none !important;}`);
     }
 
     function handleVideoAds() {
@@ -41,17 +45,17 @@
         const adCounter = {
             ads: [0, 0],
             durations: [0, 0],
-            addD: function addD(secs, idx) {
+            addD(secs, idx) {
                 this.ads[idx] = this.ads[idx] + 1;
                 if (secs) {
                     this.durations[idx] = this.durations[idx] + secs;
                 }
                 return [this.ads[idx], this.durations[idx]];
             },
-            addClickedAdDuration: function addClickedAdDuration(secs) {
+            addClickedAdDuration(secs) {
                 return this.addD(secs, 0);
             },
-            addForwardedAdDuration: function addForwardedAdDuration(secs) {
+            addForwardedAdDuration(secs) {
                 return this.addD(secs, 1);
             }
         };
@@ -62,34 +66,86 @@
             return `${durationMinutes} mins ${durationSeconds} secs`;
         }
 
-        const HTML5_MAX_SPEED = 16.0;
+        function targetAdSpeed() {
+            const HTML5_MAX_SPEED = 16.0;
+            return HTML5_MAX_SPEED;
+        }
+        class UserSpeedTracker {
+            static normalSpeed() { return 1.0; }
 
-        const memoizeUserLastSpeed = (function () {
-            const NORMAL_SPEED = 1.0;
-            let userLastSpeed = NORMAL_SPEED;
-            return function (rate) {
-                if (rate !== HTML5_MAX_SPEED) {
-                    if (rate === NORMAL_SPEED) {
+            constructor() {
+                this.userLastSpeed = UserSpeedTracker.normalSpeed();
+            }
+
+            memoizeUserLastSpeed(rate) {
+                if (rate !== targetAdSpeed()) {
+                    if (rate === UserSpeedTracker.normalSpeed()) {
                         // We can't tell if this is due to user or newly loaded video, so do nothing.
                     } else {
-                        userLastSpeed = rate;
+                        this.userLastSpeed = rate;
                     }
                 }
-                return userLastSpeed;
-            };
-        }());
+            }
 
-        function updateVideoSpeed(video, newRate) {
-            const oldRate = video.playbackRate;
-            const rateHasChanged = (oldRate !== newRate);
-            if (rateHasChanged) {
-                video.playbackRate = newRate;
-                if (newRate === HTML5_MAX_SPEED) {
-                    video.muted = true;
+            getUserLastSpeed() {
+                return this.userLastSpeed;
+            }
+        }
+
+        const userSpeedTracker = new UserSpeedTracker();
+
+        const contentEffects = [
+            function memoize(video) { userSpeedTracker.memoizeUserLastSpeed(video.playbackRate); }
+        ];
+        const toggleEffects = [
+            {
+                attribute: "muted",
+                adTest(video) { return video.muted; },
+                contentTest(video) { return !this.adTest(video); },
+                adEffect(video) { video.muted = true; },
+                contentEffect(video) { video.muted = false; },
+            }, {
+                attribute: "playbackRate",
+                adTest(video) { return video.playbackRate === targetAdSpeed(); },
+                contentTest(video) { return !this.adTest(video); },
+                adEffect(video) { video.playbackRate = targetAdSpeed(); },
+                contentEffect(video) { video.playbackRate = userSpeedTracker.getUserLastSpeed(); },
+            }, {
+                attribute: "currentTime",
+                spedUpMarker(video) { return 0.6 * video.duration; },
+                adTest(video) { return video.currentTime >= this.spedUpMarker(video); },
+                contentTest() { return true; },
+                adEffect(video) { video.currentTime = this.spedUpMarker(video); },
+                contentEffect() { }, // Do nothing.
+            }
+        ];
+
+        function updateVideoEffects(video, isAd) {
+            function adReducer(accumulator, effect) {
+                const adEffectNotYet = !effect.adTest(video);
+                if (adEffectNotYet) {
+                    //log(`Adding missing ad effect "${effect.attribute}"`);
+                    effect.adEffect(video);
+                }
+                return accumulator || adEffectNotYet;
+            }
+
+            if (isAd) {
+                const isNewAd = toggleEffects.reduce(adReducer, false);
+                if (isNewAd) {
                     const [totalAds, totalDuration] = adCounter.addForwardedAdDuration(video.duration);
                     log(`SPEEDING UP an AD (${totalAds} so far saving you ${secsToTimeString(totalDuration)}) !`);
-                } else {
-                    video.muted = false;
+                }
+            } else { // isContent
+                toggleEffects.forEach(effect => {
+                    if (!effect.contentTest(video)) {
+                        //log(`Adding missing content effect "${effect.attribute}"`);
+                        effect.contentEffect(video);
+                    }
+                });
+                contentEffects.forEach(contentEffect => contentEffect(video));
+                for (let eff of contentEffects) {
+                    eff(video);
                 }
             }
         }
@@ -98,16 +154,14 @@
             const [adContainer] = adAncestor.getElementsByClassName("video-ads");
             if (adContainer) {
                 const skipButtons = adContainer.getElementsByClassName("ytp-ad-skip-button");
-                const areSkipButtons = skipButtons.length;
-                if (areSkipButtons) {
+                if (skipButtons.length) {
+                    video.muted = true;
                     const [totalAds, totalDuration] = adCounter.addClickedAdDuration(video.duration);
                     log(`SKIPPING a clickable AD (${totalAds} so far saving you ${secsToTimeString(totalDuration)}) !`);
                     Array.from(skipButtons).forEach(skipButton => skipButton.click());
                 } else {
-                    const userLastSpeed = memoizeUserLastSpeed(video.playbackRate);
-                    const adLength = adContainer.getElementsByClassName("ytp-ad-text").length;
-                    const newRate = adLength ? HTML5_MAX_SPEED : userLastSpeed;
-                    updateVideoSpeed(video, newRate);
+                    const isAd = adContainer.getElementsByClassName("ytp-ad-text").length;
+                    updateVideoEffects(video, isAd);
                 }
             }
         }
