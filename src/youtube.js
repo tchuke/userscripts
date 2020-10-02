@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YouTube - Ad-Free!
 // @namespace    https://www.hidalgocare.com/
-// @version      0.105
+// @version      0.106
 // @description  Avoids advertisements taking away from your YouTube experience
 // @author       Antonio Hidalgo
 // @include      https://www.youtube.com/*
@@ -41,6 +41,8 @@
     }
 
     function handleVideoAds() {
+        // ".ytp-ad-message-slot .ypt-ad-message-container .ytp-ad-text.ytp-ad-message-text" shows "Ad in 3 secs"
+        addNewStyle(".ytp-ad-message-slot {display:none !important;}");
 
         const adCounter = {
             ads: [0, 0],
@@ -160,7 +162,8 @@
                     log(`SKIPPING a clickable AD (${totalAds} so far saving you ${secsToTimeString(totalDuration)}) !`);
                     Array.from(skipButtons).forEach(skipButton => skipButton.click());
                 } else {
-                    const isAd = adContainer.getElementsByClassName("ytp-ad-text").length;
+                    // ".ytp-ad-preview-slot .ypt-ad-preview-container .ytp-ad-text.ytp-ad-preview-text" shows "Ad will end in 2"
+                    const isAd = adContainer.getElementsByClassName("ytp-ad-preview-text").length;
                     updateVideoEffects(video, isAd);
                 }
             }
