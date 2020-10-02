@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YouTube - Ad-Free!
 // @namespace    https://www.hidalgocare.com/
-// @version      0.107
+// @version      0.108
 // @description  Avoids advertisements taking away from your YouTube experience
 // @author       Antonio Hidalgo
 // @include      https://www.youtube.com/*
@@ -147,9 +147,6 @@
                 }
             });
             contentEffects.forEach(contentEffect => contentEffect(video));
-            for (let eff of contentEffects) {
-                eff(video);
-            }
         }
 
         function skipAds(video, adAncestor) {
