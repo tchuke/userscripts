@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YouTube - Ad-Free!
 // @namespace    https://www.hidalgocare.com/
-// @version      0.106
+// @version      0.107
 // @description  Avoids advertisements taking away from your YouTube experience
 // @author       Antonio Hidalgo
 // @include      https://www.youtube.com/*
@@ -122,7 +122,7 @@
             }
         ];
 
-        function updateVideoEffects(video, isAd) {
+        function updateEffectsForAd(video) {
             function adReducer(accumulator, effect) {
                 const adEffectNotYet = !effect.adTest(video);
                 if (adEffectNotYet) {
@@ -132,23 +132,23 @@
                 return accumulator || adEffectNotYet;
             }
 
-            if (isAd) {
-                const isNewAd = toggleEffects.reduce(adReducer, false);
-                if (isNewAd) {
-                    const [totalAds, totalDuration] = adCounter.addForwardedAdDuration(video.duration);
-                    log(`SPEEDING UP an AD (${totalAds} so far saving you ${secsToTimeString(totalDuration)}) !`);
+            const isNewAd = toggleEffects.reduce(adReducer, false);
+            if (isNewAd) {
+                const [totalAds, totalDuration] = adCounter.addForwardedAdDuration(video.duration);
+                log(`SPEEDING UP an AD (${totalAds} so far saving you ${secsToTimeString(totalDuration)}) !`);
+            }
+        }
+
+        function updateEffectsForContent(video) {
+            toggleEffects.forEach(effect => {
+                if (!effect.contentTest(video)) {
+                    //log(`Adding missing content effect "${effect.attribute}"`);
+                    effect.contentEffect(video);
                 }
-            } else { // isContent
-                toggleEffects.forEach(effect => {
-                    if (!effect.contentTest(video)) {
-                        //log(`Adding missing content effect "${effect.attribute}"`);
-                        effect.contentEffect(video);
-                    }
-                });
-                contentEffects.forEach(contentEffect => contentEffect(video));
-                for (let eff of contentEffects) {
-                    eff(video);
-                }
+            });
+            contentEffects.forEach(contentEffect => contentEffect(video));
+            for (let eff of contentEffects) {
+                eff(video);
             }
         }
 
@@ -164,7 +164,11 @@
                 } else {
                     // ".ytp-ad-preview-slot .ypt-ad-preview-container .ytp-ad-text.ytp-ad-preview-text" shows "Ad will end in 2"
                     const isAd = adContainer.getElementsByClassName("ytp-ad-preview-text").length;
-                    updateVideoEffects(video, isAd);
+                    if (isAd) {
+                        updateEffectsForAd(video);
+                    } else {
+                        updateEffectsForContent(video);
+                    }
                 }
             }
         }
