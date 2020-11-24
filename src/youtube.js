@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YouTube - Ad-Free!
 // @namespace    https://www.hidalgocare.com/
-// @version      0.109
+// @version      0.110
 // @description  Avoids advertisements taking away from your YouTube experience
 // @author       Antonio Hidalgo
 // @include      https://www.youtube.com/*
@@ -37,7 +37,9 @@
         ytd-mealbar-promo-renderer,
         ytd-companion-slot-renderer,
         ytd-promoted-sparkles-web-renderer,
+        ytd-video-masthead-ad-v3-renderer,
         .ytd-promoted-sparkles-text-search-renderer,
+        .ytd-video-masthead-ad-advertiser-info-renderer,
         .ytp-ad-overlay-slot {display:none !important;}`);
     }
 
