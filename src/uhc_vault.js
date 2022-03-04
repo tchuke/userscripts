@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         UHC Vault Cleanup SHELL
 // @namespace    https://www.hidalgocare.com/
-// @version      0.002
+// @version      0.003
 // @description  Eliminate UHC Vault headaches
 // @author       Antonio Hidalgo
 // @include      https://coreb2c.uhcprovider.com/coreb2c/esrMpinPickList.do*
@@ -44,7 +44,7 @@
         return "RPT7_DYNAMIC_Capitation - UnitedHealthcare Preferred Care Partners~REPORT_DYNAMIC";
     }
     function getTypeCapReportMedicaValue() {
-        return "RPT6_DYNAMIC_Capitation - UnitedHealthcare Medica FL~REPORT_DYNAMIC";
+        return "RPT6_DYNAMIC_Capitation - UnitedHealthcare Preferred Care Network~REPORT_DYNAMIC";
     }
     function getSubcategoryCapDetailsFileValue() {
         return "15_Capitation Detail File (EC7810)~RPT2_DYNAMIC_RPTI";
