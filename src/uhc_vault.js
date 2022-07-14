@@ -1,12 +1,12 @@
 // ==UserScript==
 // @name         UHC Vault Cleanup SHELL
 // @namespace    https://www.hidalgocare.com/
-// @version      0.003
+// @version      0.004
 // @description  Eliminate UHC Vault headaches
 // @author       Antonio Hidalgo
-// @include      https://coreb2c.uhcprovider.com/coreb2c/esrMpinPickList.do*
-// @include      https://coreb2c.uhcprovider.com/coreb2c/ProviderTaxidAction.do*
-// @include      https://coreb2c.uhcprovider.com/coreb2c/medicareSolReport.do*
+// @include      https://linkb2c.uhcprovider.com/coreb2c/esrMpinPickList.do*
+// @include      https://linkb2c.uhcprovider.com/coreb2c/ProviderTaxidAction.do*
+// @include      https://linkb2c.uhcprovider.com/coreb2c/medicareSolReport.do*
 // @require      https://code.jquery.com/jquery-3.5.1.js
 // @updateURL    https://raw.githubusercontent.com/tchuke/userscripts/master/src/uhc_vault.js
 // @downloadURL  https://raw.githubusercontent.com/tchuke/userscripts/master/src/uhc_vault.js
@@ -136,7 +136,7 @@
             // IFrame is sandboxed as its form would otherwise navigate top-level
             const sandboxDisallowingTopNavigation = "allow-downloads allow-forms allow-same-origin allow-scripts";
             myIFrame.
-                attr('src', "https://coreb2c.uhcprovider.com/coreb2c/esrMpinPickList.do").
+                attr('src', "https://linkb2c.uhcprovider.com/coreb2c/esrMpinPickList.do").
                 attr('height', 500).
                 attr('width', 500).
                 attr('sandbox', sandboxDisallowingTopNavigation).
