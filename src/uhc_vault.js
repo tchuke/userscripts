@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         UHC Vault Cleanup SHELL
 // @namespace    https://www.hidalgocare.com/
-// @version      0.004
+// @version      0.005
 // @description  Eliminate UHC Vault headaches
 // @author       Antonio Hidalgo
 // @include      https://linkb2c.uhcprovider.com/coreb2c/esrMpinPickList.do*
@@ -99,6 +99,9 @@
     }
 
     function addIframeFun(id, payerValueToSelect, reportValueToSelect) {
+
+        const CLICK_WAIT_TIME_MILLIS = 6000;
+
         function getDropdownReportTypeSelector() {
             return "select[name=reportId]";
         }
@@ -119,7 +122,7 @@
                 setIfBlank(typeDropdown, payerValueToSelect);
                 setIfBlank(subDropdown, reportValueToSelect);
                 const searchButton = iframeContents.find("button#searchBtn");
-                setTimeout(() => searchButton.click(), 6000);
+                setTimeout(() => searchButton.click(), CLICK_WAIT_TIME_MILLIS);
             };
         }
         function afterTypeChangeFun(myIFrame) {
@@ -127,7 +130,7 @@
                 const iframeContents = myIFrame.contents();
                 const subDropdown = iframeContents.find(getDropdownReportSubcategorySelector());
                 subDropdown.val(reportValueToSelect).change();
-                setTimeout(afterSubChangeFun(myIFrame), 6000);
+                setTimeout(afterSubChangeFun(myIFrame), CLICK_WAIT_TIME_MILLIS);
             };
         }
 
@@ -146,10 +149,10 @@
                 let iframeContents = myIFrame.contents();
                 let typeDropdown = iframeContents.find(getDropdownReportTypeSelector());
                 typeDropdown.val(payerValueToSelect).change();
-                setTimeout(afterTypeChangeFun(myIFrame), 6000);
+                setTimeout(afterTypeChangeFun(myIFrame), CLICK_WAIT_TIME_MILLIS);
             }
             myIFrame.ready(() => {
-                setTimeout(setAndSubmitIframeForm, 6000);
+                setTimeout(setAndSubmitIframeForm, CLICK_WAIT_TIME_MILLIS);
             });
         };
     }
