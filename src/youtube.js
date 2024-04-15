@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YouTube - Ad-Free!
 // @namespace    https://www.hidalgocare.com/
-// @version      0.113
+// @version      0.114
 // @description  Avoids advertisements taking away from your YouTube experience
 // @author       Antonio Hidalgo
 // @include      https://www.youtube.com/*
@@ -158,7 +158,7 @@
         function skipAds(video, adAncestor) {
             const [adContainer] = adAncestor.getElementsByClassName("video-ads");
             if (adContainer) {
-                const skipButtons = adContainer.getElementsByClassName("ytp-ad-skip-button-modern");
+                const skipButtons = adContainer.querySelectorAll(".ytp-ad-skip-button-modern, .ytp-skip-ad-button");
                 if (skipButtons.length) {
                     video.muted = true;
                     const [totalAds, totalDuration] = adCounter.addClickedAdDuration(video.duration);
