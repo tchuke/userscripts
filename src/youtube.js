@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YouTube - Ad-Free!
 // @namespace    https://www.hidalgocare.com/
-// @version      0.112
+// @version      0.113
 // @description  Avoids advertisements taking away from your YouTube experience
 // @author       Antonio Hidalgo
 // @include      https://www.youtube.com/*
@@ -44,16 +44,6 @@
         .ytd-promoted-sparkles-text-search-renderer,
         ytd-video-masthead-ad-v3-renderer, 
         .ytd-video-masthead-ad-advertiser-info-renderer {display:none !important;}`);
-
-        /*
-            .video-ads.ytp-ad-module
-                - .ytp-ad-overlay-ad-info-dialog-container
-                - .ytp-ad-overlay-slot
-
-            .ytp-ad-feedback-dialog-container,
-            .ytp-ad-player-overlay-flyout-cta,
-            .ytp-ad-player-overlay-instream-info
-        */
     }
 
     function handleVideoAds() {
@@ -130,7 +120,7 @@
                 contentEffect(video) { video.playbackRate = userSpeedTracker.getUserLastSpeed(); },
             }, {
                 attribute: "currentTime",
-                spedUpMarker(video) { return 0.6 * video.duration; },
+                spedUpMarker(video) { return 0.98 * video.duration; },
                 adTest(video) { return video.currentTime >= this.spedUpMarker(video); },
                 contentTest() { return true; },
                 adEffect(video) { video.currentTime = this.spedUpMarker(video); },
@@ -175,9 +165,7 @@
                     log(`SKIPPING a clickable AD (${totalAds} so far saving you ${secsToTimeString(totalDuration)}) !`);
                     Array.from(skipButtons).forEach(skipButton => skipButton.click());
                 } else {
-                    // ".ytp-ad-preview-slot .ypt-ad-preview-container .ytp-ad-text.ytp-ad-preview-text" shows "Ad will end in 2"
-                    // also matches .ytp-ad-text but used elsewhere
-                    const isAd = adContainer.getElementsByClassName("ytp-ad-preview-text-modern").length;
+                    const isAd = adContainer.childElementCount;
                     if (isAd) {
                         updateEffectsForAd(video);
                     } else {
@@ -213,7 +201,7 @@
             // moving this to delay to try to fool the Goog
             // which prompts "Ad blockers are not allowed on YouTube"
             handleStaticAds();
-        }, 100);
+        }, 150);
     } // end of handleVideoAds()
 
     handleVideoAds();
