@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YouTube - Ad-Free!
 // @namespace    https://www.hidalgocare.com/
-// @version      0.114
+// @version      0.115
 // @description  Avoids advertisements taking away from your YouTube experience
 // @author       Antonio Hidalgo
 // @include      https://www.youtube.com/*
@@ -43,7 +43,11 @@
         ytd-promoted-sparkles-web-renderer,
         .ytd-promoted-sparkles-text-search-renderer,
         ytd-video-masthead-ad-v3-renderer, 
-        .ytd-video-masthead-ad-advertiser-info-renderer {display:none !important;}`);
+        .ytd-video-masthead-ad-advertiser-info-renderer,
+        .ytp-ad-avatar-lockup-card
+         {
+            display:none !important;
+        }`);
     }
 
     function handleVideoAds() {
@@ -57,6 +61,8 @@
                 this.ads[idx] = this.ads[idx] + 1;
                 if (secs) {
                     this.durations[idx] = this.durations[idx] + secs;
+                } else {
+                    log("video has illegitimate length " + secs);
                 }
                 return [this.ads[idx], this.durations[idx]];
             },
@@ -78,6 +84,12 @@
             const HTML5_MAX_SPEED = 16.0;
             return HTML5_MAX_SPEED;
         }
+
+        function targetAdJumpAheadPercent() {
+            const JUMP_AHEAD_PERCENT = 0.98;
+            return JUMP_AHEAD_PERCENT;
+        }
+
         class UserSpeedTracker {
             static normalSpeed() { return 1.0; }
 
@@ -120,7 +132,7 @@
                 contentEffect(video) { video.playbackRate = userSpeedTracker.getUserLastSpeed(); },
             }, {
                 attribute: "currentTime",
-                spedUpMarker(video) { return 0.98 * video.duration; },
+                spedUpMarker(video) { return targetAdJumpAheadPercent() * video.duration; },
                 adTest(video) { return video.currentTime >= this.spedUpMarker(video); },
                 contentTest() { return true; },
                 adEffect(video) { video.currentTime = this.spedUpMarker(video); },
@@ -142,36 +154,68 @@
             if (isNewAd) {
                 const [totalAds, totalDuration] = adCounter.addForwardedAdDuration(video.duration);
                 log(`SPEEDING UP an AD (${totalAds} so far saving you ${secsToTimeString(totalDuration)}) !`);
+                log(`The ad was ${video.src}`);
             }
         }
 
         function updateEffectsForContent(video) {
             toggleEffects.forEach(effect => {
                 if (!effect.contentTest(video)) {
-                    //log(`Adding missing content effect "${effect.attribute}"`);
+                    log(`Adding missing content effect "${effect.attribute}"`);
                     effect.contentEffect(video);
                 }
             });
             contentEffects.forEach(contentEffect => contentEffect(video));
         }
 
+        let lastAd = "unknown";
+
+        function processButton(total, button) {
+            if (!(button.click instanceof Function)) {
+                log("button click was not a function");
+                return false;
+            }
+            button.click();
+            const isVisible = button.checkVisibility();
+            log(`button was visible?  ${isVisible}`);
+            return total && isVisible;
+        }
+
         function skipAds(video, adAncestor) {
             const [adContainer] = adAncestor.getElementsByClassName("video-ads");
             if (adContainer) {
                 const skipButtons = adContainer.querySelectorAll(".ytp-ad-skip-button-modern, .ytp-skip-ad-button");
+                let completelySuccessful;
+
                 if (skipButtons.length) {
-                    video.muted = true;
-                    const [totalAds, totalDuration] = adCounter.addClickedAdDuration(video.duration);
-                    log(`SKIPPING a clickable AD (${totalAds} so far saving you ${secsToTimeString(totalDuration)}) !`);
-                    Array.from(skipButtons).forEach(skipButton => skipButton.click());
-                } else {
-                    const isAd = adContainer.childElementCount;
-                    if (isAd) {
-                        updateEffectsForAd(video);
+                    const theCurrentSrc = video.currentSrc;
+                    if (lastAd === theCurrentSrc) {
+                        log("we have been duped by " + theCurrentSrc);
+                        completelySuccessful = true;
                     } else {
-                        updateEffectsForContent(video);
+                        lastAd = theCurrentSrc;
+                        video.muted = true;
+                        const [totalAds, totalDuration] = adCounter.addClickedAdDuration(video.duration);
+                        completelySuccessful = Array.from(skipButtons).reduce(processButton, true);
+                        if (completelySuccessful) {
+                            log(`SKIPPING a clickable AD (${totalAds} so far saving you ${secsToTimeString(totalDuration)}) !`);
+                        }
+                        log(`completely successful ? ${completelySuccessful}`);
                     }
+                } else {
+                    completelySuccessful = false;
                 }
+
+                const isAd = adContainer.childElementCount;
+                if (isAd) {
+                    if (!completelySuccessful) {
+                        log("not completely successful so updating the effects");
+                        updateEffectsForAd(video);
+                    }
+                } else {
+                    updateEffectsForContent(video);
+                }
+
             }
         }
 
