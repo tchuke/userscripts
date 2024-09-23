@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YouTube - Ad-Free!
 // @namespace    https://www.hidalgocare.com/
-// @version      0.115
+// @version      0.116
 // @description  Avoids advertisements taking away from your YouTube experience
 // @author       Antonio Hidalgo
 // @include      https://www.youtube.com/*
@@ -18,6 +18,15 @@
     function log(arg) {
         /* eslint-disable */
         console.log(arg);
+        /* eslint-enable */
+    }
+
+    const DEBUG = false;
+    function debug(arg) {
+        /* eslint-disable */
+        if (DEBUG) {
+            console.debug(arg);
+        }
         /* eslint-enable */
     }
 
@@ -144,7 +153,7 @@
             function adReducer(accumulator, effect) {
                 const adEffectNotYet = !effect.adTest(video);
                 if (adEffectNotYet) {
-                    //log(`Adding missing ad effect "${effect.attribute}"`);
+                    debug(`Adding missing ad effect "${effect.attribute}"`);
                     effect.adEffect(video);
                 }
                 return accumulator || adEffectNotYet;
@@ -153,8 +162,8 @@
             const isNewAd = toggleEffects.reduce(adReducer, false);
             if (isNewAd) {
                 const [totalAds, totalDuration] = adCounter.addForwardedAdDuration(video.duration);
-                log(`SPEEDING UP an AD (${totalAds} so far saving you ${secsToTimeString(totalDuration)}) !`);
-                log(`The ad was ${video.src}`);
+                log(`SPEEDING UP an unskippable AD (${totalAds} so far saving you ${secsToTimeString(totalDuration)}) !`);
+                debug(`The ad was ${video.src}`);
             }
         }
 
@@ -170,14 +179,22 @@
 
         let lastAd = "unknown";
 
+        const CHECK_VISIBILITY_OPTIONS = {
+            contentVisibilityAuto: true,
+            opacityProperty: true,
+            visibilityProperty: true,
+        };
+
         function processButton(total, button) {
             if (!(button.click instanceof Function)) {
-                log("button click was not a function");
+                debug("button click was not a function");
                 return false;
             }
-            button.click();
-            const isVisible = button.checkVisibility();
-            log(`button was visible?  ${isVisible}`);
+            const isVisible = button.checkVisibility(CHECK_VISIBILITY_OPTIONS);
+            if (isVisible) {
+                button.click();
+            }
+            debug(`button was visible?  ${isVisible}`);
             return total && isVisible;
         }
 
@@ -190,17 +207,17 @@
                 if (skipButtons.length) {
                     const theCurrentSrc = video.currentSrc;
                     if (lastAd === theCurrentSrc) {
-                        log("we have been duped by " + theCurrentSrc);
+                        debug("we have been duped by " + theCurrentSrc);
                         completelySuccessful = true;
                     } else {
                         lastAd = theCurrentSrc;
                         video.muted = true;
-                        const [totalAds, totalDuration] = adCounter.addClickedAdDuration(video.duration);
                         completelySuccessful = Array.from(skipButtons).reduce(processButton, true);
                         if (completelySuccessful) {
+                            const [totalAds, totalDuration] = adCounter.addClickedAdDuration(video.duration);
                             log(`SKIPPING a clickable AD (${totalAds} so far saving you ${secsToTimeString(totalDuration)}) !`);
                         }
-                        log(`completely successful ? ${completelySuccessful}`);
+                        debug(`completely successful ? ${completelySuccessful}`);
                     }
                 } else {
                     completelySuccessful = false;
@@ -209,7 +226,7 @@
                 const isAd = adContainer.childElementCount;
                 if (isAd) {
                     if (!completelySuccessful) {
-                        log("not completely successful so updating the effects");
+                        debug("Could not skip so updating the effects");
                         updateEffectsForAd(video);
                     }
                 } else {
@@ -235,7 +252,7 @@
             if (onPageWithPlayer) {
                 const players = document.querySelectorAll("div.html5-video-player");
                 const playersSpotted = players.length;
-                log(`players spotted: ${playersSpotted}`);
+                debug(`players spotted: ${playersSpotted}`);
                 if (playersSpotted) {
                     const [player] = players;
                     startPlayerObserver(player);
