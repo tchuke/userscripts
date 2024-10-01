@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YouTube - Ad-Free!
 // @namespace    https://www.hidalgocare.com/
-// @version      0.116
+// @version      0.117
 // @description  Avoids advertisements taking away from your YouTube experience
 // @author       Antonio Hidalgo
 // @include      https://www.youtube.com/*
@@ -43,19 +43,36 @@
 
     function handleStaticAds() {
         // tp-yt-paper-dialog -  matches no-ad-blockers prompt BUT ALSO Share dialog
+        // Recurrings candidates for wildcards: -ad-, -promo
         addNewStyle(`
-        .video-ads,
-        .ytp-ad-module,
+        #offer-module,
+        ytd-ad-slot-renderer,
+        ytd-merch-shelf-renderer,
         ytd-mealbar-promo-renderer,
         yt-mealbar-promo-renderer,
         ytd-companion-slot-renderer,
         ytd-promoted-sparkles-web-renderer,
-        .ytd-promoted-sparkles-text-search-renderer,
         ytd-video-masthead-ad-v3-renderer, 
+        .ytd-promoted-sparkles-text-search-renderer,
         .ytd-video-masthead-ad-advertiser-info-renderer,
-        .ytp-ad-avatar-lockup-card
-         {
+        .ytp-ad-avatar-lockup-card,
+        .ytp-ad-action-interstitial-background-container {
             display:none !important;
+        }
+        .ytp-ad-action-interstitial {
+            background-color: black !important;
+        }
+        .ytp-ad-action-interstitial-slot {
+            background-color: black !important;
+            opacity: 0.05;
+        }
+        .video-ads,
+        .ytp-ad-module {
+            height: 2px;
+            width:  2px;
+        }
+        .ytp-ad-skip-button-container {
+            margin-right: 25% !important;
         }`);
     }
 
@@ -185,54 +202,68 @@
             visibilityProperty: true,
         };
 
-        function processButton(total, button) {
-            if (!(button.click instanceof Function)) {
-                debug("button click was not a function");
-                return false;
+        function handleIfSkippable(video, adContainer) {
+
+            function processButton(total, button) {
+                if (!(button.click instanceof Function)) {
+                    debug("button click was not a function");
+                    return false;
+                }
+
+                // Would be Invisible if button is hidden by handleStaticAds()
+                // NOTE: Skip Ads button is not visible at mutation time
+
+                const isVisible = button.checkVisibility(CHECK_VISIBILITY_OPTIONS);
+                if (isVisible) {
+                    // programmatic button click event has isTrusted==false
+                    button.click();
+                }
+                debug(`button was visible?  ${isVisible}`);
+                // YT will not call handler if event.isTrusted==false
+                const clickHandlerCalled = false;
+                return total && clickHandlerCalled;
             }
-            const isVisible = button.checkVisibility(CHECK_VISIBILITY_OPTIONS);
-            if (isVisible) {
-                button.click();
+
+            const skipButtons = adContainer.querySelectorAll(".ytp-ad-skip-button-modern, .ytp-skip-ad-button");
+            let completelySuccessful;
+            if (skipButtons.length) {
+                const theCurrentSrc = video.currentSrc;
+                if (lastAd === theCurrentSrc) {
+                    debug("we have been duped by " + theCurrentSrc);
+                    completelySuccessful = true;
+                } else {
+                    lastAd = theCurrentSrc;
+                    video.muted = true;
+                    completelySuccessful = Array.from(skipButtons).reduce(processButton, true);
+                    if (completelySuccessful) {
+                        const [totalAds, totalDuration] = adCounter.addClickedAdDuration(video.duration);
+                        log(`SKIPPING a clickable AD (${totalAds} so far saving you ${secsToTimeString(totalDuration)}) !`);
+                    }
+                    debug(`completely successful ? ${completelySuccessful}`);
+                }
+            } else {
+                completelySuccessful = false;
             }
-            debug(`button was visible?  ${isVisible}`);
-            return total && isVisible;
+            return completelySuccessful;
+        }
+
+        function handleIfAdOrContent(video, adContainer, skipWasSuccessful) {
+            const isAd = adContainer.childElementCount;
+            if (isAd) {
+                if (!skipWasSuccessful) {
+                    debug("Could not skip so updating the effects");
+                    updateEffectsForAd(video);
+                }
+            } else {
+                updateEffectsForContent(video);
+            }
         }
 
         function skipAds(video, adAncestor) {
             const [adContainer] = adAncestor.getElementsByClassName("video-ads");
             if (adContainer) {
-                const skipButtons = adContainer.querySelectorAll(".ytp-ad-skip-button-modern, .ytp-skip-ad-button");
-                let completelySuccessful;
-
-                if (skipButtons.length) {
-                    const theCurrentSrc = video.currentSrc;
-                    if (lastAd === theCurrentSrc) {
-                        debug("we have been duped by " + theCurrentSrc);
-                        completelySuccessful = true;
-                    } else {
-                        lastAd = theCurrentSrc;
-                        video.muted = true;
-                        completelySuccessful = Array.from(skipButtons).reduce(processButton, true);
-                        if (completelySuccessful) {
-                            const [totalAds, totalDuration] = adCounter.addClickedAdDuration(video.duration);
-                            log(`SKIPPING a clickable AD (${totalAds} so far saving you ${secsToTimeString(totalDuration)}) !`);
-                        }
-                        debug(`completely successful ? ${completelySuccessful}`);
-                    }
-                } else {
-                    completelySuccessful = false;
-                }
-
-                const isAd = adContainer.childElementCount;
-                if (isAd) {
-                    if (!completelySuccessful) {
-                        debug("Could not skip so updating the effects");
-                        updateEffectsForAd(video);
-                    }
-                } else {
-                    updateEffectsForContent(video);
-                }
-
+                const completelySuccessful = handleIfSkippable(video, adContainer);
+                handleIfAdOrContent(video, adContainer, completelySuccessful);
             }
         }
 
