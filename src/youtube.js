@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YouTube - Ad-Free!
 // @namespace    https://www.hidalgocare.com/
-// @version      0.117
+// @version      0.118
 // @description  Avoids advertisements taking away from your YouTube experience
 // @author       Antonio Hidalgo
 // @include      https://www.youtube.com/*
@@ -15,6 +15,8 @@
 (function () {
     'use strict';
 
+    const SCRIPT_LOAD_TIME = Date.now();
+
     function log(arg) {
         /* eslint-disable */
         console.log(arg);
@@ -23,11 +25,11 @@
 
     const DEBUG = false;
     function debug(arg) {
-        /* eslint-disable */
         if (DEBUG) {
+            /* eslint-disable */
             console.debug(arg);
+            /* eslint-enable */
         }
-        /* eslint-enable */
     }
 
     function addNewStyle(newStyle) {
@@ -64,7 +66,7 @@
         }
         .ytp-ad-action-interstitial-slot {
             background-color: black !important;
-            opacity: 0.05;
+            opacity: 0.07;
         }
         .video-ads,
         .ytp-ad-module {
@@ -72,7 +74,7 @@
             width:  2px;
         }
         .ytp-ad-skip-button-container {
-            margin-right: 25% !important;
+            margin-right: 33% !important;
         }`);
     }
 
@@ -112,7 +114,7 @@
         }
 
         function targetAdJumpAheadPercent() {
-            const JUMP_AHEAD_PERCENT = 0.98;
+            const JUMP_AHEAD_PERCENT = 0.95;
             return JUMP_AHEAD_PERCENT;
         }
 
@@ -143,28 +145,51 @@
         const contentEffects = [
             function memoize(video) { userSpeedTracker.memoizeUserLastSpeed(video.playbackRate); }
         ];
-        const toggleEffects = [
-            {
-                attribute: "muted",
-                adTest(video) { return video.muted; },
-                contentTest(video) { return !this.adTest(video); },
-                adEffect(video) { video.muted = true; },
-                contentEffect(video) { video.muted = false; },
-            }, {
-                attribute: "playbackRate",
-                adTest(video) { return video.playbackRate === targetAdSpeed(); },
-                contentTest(video) { return !this.adTest(video); },
-                adEffect(video) { video.playbackRate = targetAdSpeed(); },
-                contentEffect(video) { video.playbackRate = userSpeedTracker.getUserLastSpeed(); },
-            }, {
-                attribute: "currentTime",
-                spedUpMarker(video) { return targetAdJumpAheadPercent() * video.duration; },
-                adTest(video) { return video.currentTime >= this.spedUpMarker(video); },
-                contentTest() { return true; },
-                adEffect(video) { video.currentTime = this.spedUpMarker(video); },
-                contentEffect() { }, // Do nothing.
-            }
-        ];
+
+        const MUTE_EFFECT = {
+            attribute: "muted",
+            adTest(video) { return video.muted; },
+            contentTest(video) { return !this.adTest(video); },
+            adEffect(video) { video.muted = true; },
+            contentEffect(video) { video.muted = false; },
+        };
+
+        const FADE_EFFECT = {
+            attribute: "faded",
+            fadedValue() { return "0.1"; },
+            unfadedValue() { return "1"; },
+            adTest(video) {
+                const testResult = video.style.opacity === this.fadedValue();
+                debug("faded ad test is " + testResult + " with opacity of '" + video.style.opacity + "'");
+                return testResult;
+            },
+            contentTest(video) {
+                const testResult = video.style.opacity === this.unfadedValue();
+                debug("faded content test is " + testResult + " with opacity of '" + video.style.opacity + "'");
+                return testResult;
+            },
+            adEffect(video) { video.style.opacity = this.fadedValue(); },
+            contentEffect(video) { video.style.opacity = this.unfadedValue(); },
+        };
+
+        const SPEEDEN_EFFECT = {
+            attribute: "playbackRate",
+            adTest(video) { return video.playbackRate === targetAdSpeed(); },
+            contentTest(video) { return !this.adTest(video); },
+            adEffect(video) { video.playbackRate = targetAdSpeed(); },
+            contentEffect(video) { video.playbackRate = userSpeedTracker.getUserLastSpeed(); },
+        };
+
+        const JUMP_FORWARD_EFFECT = {
+            attribute: "currentTime",
+            spedUpMarker(video) { return targetAdJumpAheadPercent() * video.duration; },
+            adTest(video) { return video.currentTime >= this.spedUpMarker(video); },
+            contentTest() { return true; },
+            adEffect(video) { video.currentTime = this.spedUpMarker(video); },
+            contentEffect() { }, // Do nothing.
+        };
+
+        const TOGGLE_EFFECTS = [MUTE_EFFECT, FADE_EFFECT, SPEEDEN_EFFECT, JUMP_FORWARD_EFFECT];
 
         function updateEffectsForAd(video) {
             function adReducer(accumulator, effect) {
@@ -176,7 +201,7 @@
                 return accumulator || adEffectNotYet;
             }
 
-            const isNewAd = toggleEffects.reduce(adReducer, false);
+            const isNewAd = TOGGLE_EFFECTS.reduce(adReducer, false);
             if (isNewAd) {
                 const [totalAds, totalDuration] = adCounter.addForwardedAdDuration(video.duration);
                 log(`SPEEDING UP an unskippable AD (${totalAds} so far saving you ${secsToTimeString(totalDuration)}) !`);
@@ -185,9 +210,10 @@
         }
 
         function updateEffectsForContent(video) {
-            toggleEffects.forEach(effect => {
+            debug("updateEffectsForContent()");
+            TOGGLE_EFFECTS.forEach(effect => {
                 if (!effect.contentTest(video)) {
-                    log(`Adding missing content effect "${effect.attribute}"`);
+                    debug(`Adding missing content effect "${effect.attribute}"`);
                     effect.contentEffect(video);
                 }
             });
@@ -268,6 +294,9 @@
         }
 
         function startPlayerObserver(target) {
+            const OBSERVER_START_TIME = Date.now();
+            log(`starting Player Observer after ${OBSERVER_START_TIME - SCRIPT_LOAD_TIME} millis.`);
+
             const options = {
                 childList: true,
                 subtree: true,
